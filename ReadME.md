@@ -9,14 +9,23 @@ Hebrew text-to-speech with real-time streaming and GPU acceleration.
 
 ## Setup
 
-Install [uv](https://docs.astral.sh/uv/) then:
+Install [uv](https://docs.astral.sh/uv/), then clone the repo and DiffMamba:
 
 ```bash
 git clone <this-repo>
 cd Mamre-TTS
 git clone https://github.com/maxmelichov/DiffMamba.git
+```
 
+Run the installer (creates venv, installs PyTorch CUDA, and project deps):
+
+```bash
 ./install.sh
+```
+
+Install the DiffMamba backend:
+
+```bash
 cd DiffMamba && uv pip install -e . && cd ..
 ```
 
