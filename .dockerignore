@@ -1,0 +1,23 @@
+venv/
+.git/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+
+# Large local artifacts
+*.wav
+*.flac
+*.ogg
+*.m4a
+*.aiff
+*.aif
+
+# Do NOT ignore model weights directory
+# weights/
