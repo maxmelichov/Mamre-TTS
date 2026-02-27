@@ -129,7 +129,7 @@ def train(args):
     autoencoder.dac.to(device1)
 
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt")
 
     checkpoint_path = getattr(args, "checkpoint", "") or ""
     if checkpoint_path:
@@ -292,7 +292,17 @@ def train(args):
             sample_conditioning = base.prepare_conditioning(sample_cond_dict)
 
             with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                out_codes = base.generate(sample_conditioning, batch_size=1, cfg_scale=4.0)
+                # Use a larger repetition_penalty_window to reduce audio repetition (default 2 is too small)
+                sampling_params = dict(
+                    min_p=0.1,
+                    repetition_penalty=3.0,
+                    repetition_penalty_window=64,
+                )
+                out_codes = base.generate(
+                    sample_conditioning,
+                    batch_size=1,
+                    sampling_params=sampling_params,
+                )
             out_wav = base.autoencoder.decode(out_codes.to(device1)).cpu()
             sample_out_path = os.path.join(args.save_dir, f"sample_epoch_{epoch+1}.wav")
             torchaudio.save(sample_out_path, out_wav[0], base.autoencoder.sampling_rate)

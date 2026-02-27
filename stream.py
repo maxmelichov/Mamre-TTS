@@ -1,5 +1,7 @@
 import os
+import sys
 import time
+import argparse
 
 import torch
 import torchaudio
@@ -133,12 +135,36 @@ def split_text_into_segments(text):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Stream TTS with Mamre")
+    parser.add_argument(
+        "--voice",
+        "-v",
+        type=str,
+        default=os.getenv("MAMRE_VOICE", "voices/Female1.mp3"),
+        help="Path to reference audio for speaker embedding (default: voices/reference.mp3 or MAMRE_VOICE)",
+    )
+    args = parser.parse_args()
+    voice_path = args.voice
+
+    if not os.path.isfile(voice_path):
+        print(
+            f"Error: Reference audio file not found: {voice_path}",
+            file=sys.stderr,
+        )
+        print(
+            "Provide a path to a short reference recording (e.g. WAV or MP3), e.g.:",
+            file=sys.stderr,
+        )
+        print("  uv run stream.py --voice /path/to/your/voice.wav", file=sys.stderr)
+        print("  or set MAMRE_VOICE=/path/to/voice.wav", file=sys.stderr)
+        sys.exit(1)
+
     # Use CUDA if available.
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load the model (here we use the transformer variant).
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json", device="cpu")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", device="cpu")
 
     model.eval()
     model.to(device)
@@ -149,8 +175,8 @@ def main():
     samples_per_ms = out_sr / 1000.0
 
     # Load a reference speaker audio to generate a speaker embedding.
-    print("Loading reference audio...")
-    wav, sr = torchaudio.load("voices/AUD-20251102-WA0012.mp3")
+    print(f"Loading reference audio from {voice_path}...")
+    wav, sr = torchaudio.load(voice_path)
     speaker = model.make_speaker_embedding(wav, sr)
 
     # Set a random seed for reproducibility.

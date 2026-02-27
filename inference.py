@@ -83,7 +83,7 @@ def main():
 
     # Load model
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json", device="cpu")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", device="cpu")
 
     # Optional checkpoint
     ckpt = "checkpoints/train_epoch_1.pt"

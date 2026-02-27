@@ -241,12 +241,14 @@ class Mamre(nn.Module):
         max_new_tokens: int = 86 * 30,
         cfg_scale: float = 2.0,
         batch_size: int = 1,
-        sampling_params: dict = dict(min_p=0.1),
+        sampling_params: dict = None,
         progress_bar: bool = True,
         disable_torch_compile: bool = False,
         callback: Callable[[torch.Tensor, int, int], bool] | None = None,
     ):
         assert cfg_scale != 1, "TODO: add support for cfg_scale=1"
+        if sampling_params is None:
+            sampling_params = dict(min_p=0.1, repetition_penalty=3.0, repetition_penalty_window=64)
         prefix_audio_len = 0 if audio_prefix_codes is None else audio_prefix_codes.shape[2]
         device = self.device
         # Ensure conditioning matches model dtype/device to keep attention Q/K dtypes consistent
