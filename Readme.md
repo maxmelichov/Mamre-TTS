@@ -41,6 +41,8 @@ Place under `./weights`:
 
 No Hugging Face downloads at runtime; missing files → model load fails.
 
+**Model weights are for non-commercial use only.** See [License](#license).
+
 ## Scripts
 
 ```bash
@@ -74,4 +76,8 @@ CSV must have columns `filename` (path to WAV) and `phonemes` (transcription); o
 
 ## License
 
-See upstream licenses for components.
+**Code and model architecture:** Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
+
+**Model weights** (e.g. files in `./weights`): **non-commercial use only.** You may not use the provided weights for commercial purposes.
+
+Upstream components may have their own licenses.
