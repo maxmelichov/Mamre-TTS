@@ -11,6 +11,7 @@ import numpy as np
 import re
 
 from Mamre.model import Mamre
+from Mamre.conditioning import make_cond_dict
 
 texts = [
     """בעידן הבינה המלאכותית, הגבולות בין אדם למכונה מיטשטשים יותר מתמיד. יכולות החישוב והלמידה של מערכות מתקדמות מאפשרות כיום למחשבים להבין שפה, ליצור תוכן, ואף לזהות רגשות או כוונות אנושיות. עם זאת, האתגר האמיתי אינו רק טכנולוגי — הוא מוסרי וחברתי. השאלה איננה "מה אפשר לבנות", אלא "מה נכון לבנות". ככל שהטכנולוגיה מתקדמת, כך גוברת האחריות של המפתחים לוודא שהיא משרתת את האנושות — ולא להפך."""
@@ -164,7 +165,7 @@ def main():
 
     # Load the model (here we use the transformer variant).
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", device="cpu")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.safetensors", device="cpu")
 
     model.eval()
     model.to(device)
@@ -177,6 +178,10 @@ def main():
     # Load a reference speaker audio to generate a speaker embedding.
     print(f"Loading reference audio from {voice_path}...")
     wav, sr = torchaudio.load(voice_path)
+    if wav.shape[0] > 1:
+        wav = wav.mean(dim=0, keepdim=True)
+    wav = torchaudio.functional.resample(wav, sr, out_sr)
+    sr = out_sr
     speaker = model.make_speaker_embedding(wav, sr)
 
     # Set a random seed for reproducibility.
@@ -210,59 +215,54 @@ def main():
         wav_writer.setsampwidth(2)
         wav_writer.setframerate(out_sr)
 
-    # --- STREAMING GENERATION (per-segment reset) ---
-    print("Starting per-segment streaming generation...")
-
-    chunk_schedule = [22, 13, *range(12, 100)]
-    chunk_overlap = 1
+    # --- Per-segment generation (using model.generate; no chunk streaming) ---
+    # Pass Hebrew text + language="he"; model's conditioner does Phonikud + espeak internally (same as train).
+    print("Starting per-segment generation...")
 
     seg_counter = 0
     for seg_idx, segment in enumerate(segments):
         if not segment.strip():
             continue
 
-        def build_segment_generator():
-            def _gen():
-                elapsed = int((time.time() - t0) * 1000)
-                preview = segment[:80] + ("..." if len(segment) > 80 else "")
-                print(f"Yielding segment {seg_idx + 1}/{len(segments)} at {elapsed}ms: {preview}")
-                yield {
-                    "text": segment,
-                    "speaker": speaker,
-                    "language": "he",
-                }
-            return _gen()
+        elapsed = int((time.time() - t0) * 1000)
+        preview = segment[:80] + ("..." if len(segment) > 80 else "")
+        print(f"Segment {seg_idx + 1}/{len(segments)} at {elapsed}ms: {preview}")
 
         segment_success = False
         last_error = None
+        max_new_tokens = max(200, int(len(segment) * 6.5))
 
         for attempt in range(1, MAX_SEGMENT_RETRIES + 1):
             try:
-                stream_generator = model.stream(
-                    cond_dicts_generator=build_segment_generator(),
-                    chunk_schedule=chunk_schedule,
-                    chunk_overlap=chunk_overlap,
-                    mark_boundaries=False,
+                cond = make_cond_dict(
+                    text=segment,
+                    language="he",
+                    speaking_rate=9.0,
+                    speaker=speaker,
                 )
-
-                for audio_chunk in stream_generator:
-                    ensure_wav_writer(int(audio_chunk.shape[0]))
-
-                    chunk = audio_chunk.detach().to(torch.float32).clamp_(-1.0, 1.0).cpu()
-                    pcm16 = (chunk.numpy().T * 32767.0).astype(np.int16)
-                    wav_writer.writeframes(pcm16.tobytes())
-
-                    elapsed = int((time.time() - t0) * 1000)
-                    if ttfb is None:
-                        ttfb = elapsed
-                    gap = "GAP" if ttfb + generated < elapsed else ""
-                    generated += int(audio_chunk.shape[1] / samples_per_ms)
-                    seg_counter += 1
-                    print(
-                        f"Chunk {seg_counter:>3}: elapsed {elapsed:>5}ms | "
-                        f"generated up to {ttfb + generated:>5}ms {gap}"
+                conditioning = model.prepare_conditioning(cond)
+                with torch.inference_mode():
+                    codes = model.generate(
+                        conditioning,
+                        max_new_tokens=max_new_tokens,
+                        progress_bar=False,
                     )
-
+                wav_out = model.autoencoder.decode(codes).detach().float().clamp_(-1.0, 1.0).cpu()[0]
+                if wav_out.dim() == 1:
+                    wav_out = wav_out.unsqueeze(0)
+                ensure_wav_writer(wav_out.shape[0])
+                pcm16 = (wav_out.numpy().T * 32767.0).astype(np.int16)
+                wav_writer.writeframes(pcm16.tobytes())
+                elapsed = int((time.time() - t0) * 1000)
+                if ttfb is None:
+                    ttfb = elapsed
+                seg_dur_ms = int(wav_out.shape[1] / samples_per_ms)
+                generated += seg_dur_ms
+                seg_counter += 1
+                print(
+                    f"Segment {seg_idx + 1} done: {seg_dur_ms}ms audio | "
+                    f"elapsed {elapsed}ms | total generated {generated}ms"
+                )
                 segment_success = True
                 break
 

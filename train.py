@@ -129,7 +129,7 @@ def train(args):
     autoencoder.dac.to(device1)
 
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.safetensors")
 
     checkpoint_path = getattr(args, "checkpoint", "") or ""
     if checkpoint_path:

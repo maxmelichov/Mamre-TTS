@@ -1,5 +1,6 @@
 from functools import cache
 from typing import Any, Literal, Iterable, Union, List
+import os
 
 import torch
 import torch.nn as nn
@@ -8,6 +9,7 @@ from Mamre.config import PrefixConditionerConfig
 from Mamre.utils import DEFAULT_DEVICE
 from huggingface_hub import hf_hub_download
 from phonikud_onnx import Phonikud
+from phonikud import phonemize as phonikud_phonemize
 
 
 class Conditioner(nn.Module):
@@ -233,15 +235,66 @@ class EspeakPhonemeConditioner(Conditioner):
     def __init__(self, output_dim: int, revision: str = "main", **kwargs):
         super().__init__(output_dim, **kwargs)
         self.phoneme_embedder = nn.Embedding(len(SPECIAL_TOKEN_IDS) + len(symbols), output_dim)
+        # Ensure phonikud_onnx runs fully offline: force both the ONNX model
+        # and its tokenizer to load from local files under ./weights.
+        self._patch_tokenizer_for_offline()
         phonikud_path = self.download_phonikud(revision)
         self.phonikud = Phonikud(phonikud_path)
-    
+
+    def _patch_tokenizer_for_offline(self):
+        """
+        Monkey-patch tokenizers.Tokenizer.from_pretrained so that the
+        tokenizer used by phonikud_onnx is loaded from a local JSON file
+        (./weights/dictabert_tokenizer.json) instead of contacting the Hub.
+        """
+        try:
+            from pathlib import Path
+            from tokenizers import Tokenizer
+        except Exception:
+            # If tokenizers isn't available for some reason, just skip patching.
+            return
+
+        # Avoid patching multiple times
+        if getattr(Tokenizer, "_mamre_offline_patched", False):
+            return
+
+        project_root = Path(__file__).resolve().parent.parent
+        local_tokenizer_path = project_root / "weights" / "dictabert_tokenizer.json"
+
+        original_from_pretrained = getattr(Tokenizer, "from_pretrained", None)
+
+        def _from_pretrained(name: str, *args, **kwargs):
+            # Always try to use the local tokenizer JSON if it exists.
+            if local_tokenizer_path.exists():
+                return Tokenizer.from_file(str(local_tokenizer_path))
+            # If the local file is missing, fall back to the original behavior
+            # (this may try to hit the Hub, but makes the failure mode explicit).
+            if original_from_pretrained is not None:
+                return original_from_pretrained(name, *args, **kwargs)
+            raise RuntimeError(
+                "Tokenizer.from_pretrained is not available and "
+                f"local tokenizer file not found at {local_tokenizer_path}"
+            )
+
+        Tokenizer.from_pretrained = staticmethod(_from_pretrained)
+        Tokenizer._mamre_offline_patched = True
+
     def download_phonikud(self, revision: str):
-        return hf_hub_download(
-            repo_id="notmax123/Zonos-Hebrew",
-            filename="phonikud-1.0.onnx",
-            revision=revision
-        )
+        """
+        Always load the Phonikud ONNX model from a local file under ./weights.
+
+        No network access or Hub downloads are performed here.
+        """
+        from pathlib import Path
+
+        project_root = Path(__file__).resolve().parent.parent
+        local_path = project_root / "weights" / "phonikud-1.0.onnx"
+        if not local_path.exists():
+            raise RuntimeError(
+                f"Required local Phonikud ONNX model not found at {local_path}. "
+                "Place phonikud-1.0.onnx under weights/ before running."
+            )
+        return str(local_path)
     @staticmethod
     def _contains_hebrew_letters(s: str) -> bool:
                 return any("\u0590" <= ch <= "\u05FF" for ch in s)
@@ -261,22 +314,24 @@ class EspeakPhonemeConditioner(Conditioner):
         """
         device = self.phoneme_embedder.weight.device
 
-        if "he" in languages:
-            phonemes = []
-            for text in texts:
+        if any(lang == "he" for lang in languages):
+            phonemes: list[str] = []
+            for text, lang in zip(texts, languages):
+                # If not Hebrew in this position, use generic phonemizer
+                if lang != "he":
+                    phonemes.append(phonemize_not_he([text], [lang])[0])
+                    continue
                 # If already IPA-like (e.g., "hˈu tsafˈa …"), just append it
                 if self._looks_like_prephonemized_ipa(text):
                     phonemes.append(text)
                     continue
-
                 # If Hebrew niqqud already present, skip adding diacritics
                 if self._contains_hebrew_niqqud(text):
                     diacritized = text
                 else:
                     diacritized = self.phonikud.add_diacritics(text)
-
-                text = phonemize(diacritized, languages)
-                phonemes.append(text)
+                # Convert to IPA using Phonikud phonemizer for Hebrew
+                phonemes.append(phonikud_phonemize(diacritized))
         else:
             phonemes = phonemize_not_he(texts, languages)  # generic phonemizer
 
