@@ -137,8 +137,9 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Load the model (here we use the transformer variant).
-    print("Loading model...")
-    model = Mamre.from_pretrained(device="cpu")
+    print("Loading model from notmax123/MamreTTS...")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json", device="cpu")
+
     model.eval()
     model.to(device)
     model.autoencoder.dac.eval()

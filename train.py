@@ -128,12 +128,17 @@ def train(args):
     autoencoder.dac.requires_grad_(False)
     autoencoder.dac.to(device1)
 
-    print("Loading model from Hugging Face: Zyphra/Zonos-v0.1-hybrid")
-    model = Mamre.from_pretrained("Zyphra/Zonos-v0.1-hybrid")
+    print("Loading model from notmax123/MamreTTS...")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json")
+
     checkpoint_path = getattr(args, "checkpoint", "") or ""
     if checkpoint_path:
         try:
             state = torch.load(checkpoint_path, map_location="cpu")
+            if "model" in state:
+                state = state["model"]
+            elif "state_dict" in state:
+                state = state["state_dict"]
             _load_state_dict(model, state)
             print("Checkpoint loaded.")
         except Exception as e:

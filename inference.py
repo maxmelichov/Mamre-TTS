@@ -82,8 +82,8 @@ def main():
     os.makedirs("generated_segments", exist_ok=True)
 
     # Load model
-    print("Loading model...")
-    model = Mamre.from_pretrained("Zyphra/Zonos-v0.1-hybrid", device="cpu")
+    print("Loading model from notmax123/MamreTTS...")
+    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.pt", config_path="config.json", device="cpu")
 
     # Optional checkpoint
     ckpt = "checkpoints/train_epoch_1.pt"

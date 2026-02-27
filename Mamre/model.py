@@ -60,10 +60,11 @@ class Mamre(nn.Module):
 
     @classmethod
     def from_pretrained(
-        cls, repo_id: str, revision: str | None = None, device: str = DEFAULT_DEVICE, **kwargs
+        cls, repo_id: str, revision: str | None = None, device: str = DEFAULT_DEVICE, model_filename: str = "model.safetensors", config_path: str | None = None, **kwargs
     ) -> "Mamre":
-        config_path = hf_hub_download(repo_id=repo_id, filename="config.json", revision=revision)
-        model_path = hf_hub_download(repo_id=repo_id, filename="model.safetensors", revision=revision)
+        if config_path is None:
+            config_path = hf_hub_download(repo_id=repo_id, filename="config.json", revision=revision)
+        model_path = hf_hub_download(repo_id=repo_id, filename=model_filename, revision=revision)
         return cls.from_local(config_path, model_path, device, **kwargs)
 
     @classmethod
@@ -84,10 +85,22 @@ class Mamre(nn.Module):
         model.autoencoder.dac.to(device)
 
         sd = model.state_dict()
-        with safetensors.safe_open(model_path, framework="pt") as f:
-            for k in f.keys():
-                sd[k] = f.get_tensor(k)
-        model.load_state_dict(sd, strict=False)
+        if model_path.endswith(".safetensors"):
+            with safetensors.safe_open(model_path, framework="pt") as f:
+                for k in f.keys():
+                    sd[k] = f.get_tensor(k)
+            model.load_state_dict(sd, strict=False)
+        else:
+            # Assume torch checkpoint (pt/pth/bin)
+            state = torch.load(model_path, map_location="cpu")
+            if "model" in state:
+                state = state["model"]
+            elif "state_dict" in state:
+                state = state["state_dict"]
+            # Handle potential DataParallel prefix
+            if any(k.startswith("module.") for k in state.keys()):
+                state = {k.replace("module.", ""): v for k, v in state.items()}
+            model.load_state_dict(state, strict=False)
 
         return model
 
