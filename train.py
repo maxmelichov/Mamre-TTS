@@ -182,26 +182,26 @@ def train(args):
 
                 batch_size, n_codebooks, seq_len = latent_codes.shape
                 eos_token = torch.full((batch_size, n_codebooks, 1),
-                                         model.eos_token_id,
+                                         base.eos_token_id,
                                          device=device0,
                                          dtype=latent_codes.dtype)
                 latent_codes = torch.cat([latent_codes, eos_token], dim=2)
 
-                teacher_codes = shift_right(latent_codes, mask_token=model.masked_token_id)
-                delayed_teacher_codes = apply_delay_pattern(teacher_codes, mask_token=model.masked_token_id)
+                teacher_codes = shift_right(latent_codes, mask_token=base.masked_token_id)
+                delayed_teacher_codes = apply_delay_pattern(teacher_codes, mask_token=base.masked_token_id)
 
                 optimizer.zero_grad()
-                hidden_states = model.embed_codes(delayed_teacher_codes)
+                hidden_states = base.embed_codes(delayed_teacher_codes)
                 if batch_size == 1:
-                    spk_emb = model.make_speaker_embedding(unpadded_waveforms[0].to(device1), sr).to(device0)
+                    spk_emb = base.make_speaker_embedding(unpadded_waveforms[0].to(device1), sr).to(device0)
                     cond_dict = make_cond_dict_train(text=texts, speaker=spk_emb, language="he", device=device0)
-                    prefix_cond = model.prefix_conditioner(cond_dict)
+                    prefix_cond = base.prefix_conditioner(cond_dict)
                 else:
                     prefix_conds = []
                     for j, (unpadded_wav, text) in enumerate(zip(unpadded_waveforms, texts)):
-                        spk_emb = model.make_speaker_embedding(unpadded_wav.to(device1), sr).to(device0)
+                        spk_emb = base.make_speaker_embedding(unpadded_wav.to(device1), sr).to(device0)
                         cond_dict = make_cond_dict_train(text=[text], speaker=spk_emb, language="he", device=device0)
-                        single_prefix_cond = model.prefix_conditioner(cond_dict)
+                        single_prefix_cond = base.prefix_conditioner(cond_dict)
                         prefix_conds.append(single_prefix_cond)
                     max_prefix_len = max(p.shape[1] for p in prefix_conds)
                     prefix_conds = [
@@ -215,9 +215,9 @@ def train(args):
                     prefix_cond = torch.cat(prefix_conds, dim=0)
                 
                 full_hidden = torch.cat([prefix_cond, hidden_states], dim=1)
-                backbone_out = model.backbone(full_hidden)
+                backbone_out = base.backbone(full_hidden)
                 pred_hidden = backbone_out[:, prefix_cond.shape[1]:, :]
-                pred_logits = model.apply_heads(pred_hidden)
+                pred_logits = base.apply_heads(pred_hidden)
 
                 pred_logits = revert_delay_pattern_logits(pred_logits)
 
@@ -271,28 +271,28 @@ def train(args):
         print(f"Saved checkpoint to {ckpt_path}")
 
         print("Generating sample audio...")
-        model.eval()
+        base.eval()
         with torch.no_grad():
-            test_wav_path = "excerpt_7-04_to_7-14.wav"
+            test_wav_path = "voices/Female1.mp3"
             if os.path.isfile(test_wav_path):
                 sample_wav, sample_sr = torchaudio.load(test_wav_path)
                 if sample_wav.shape[0] > 1:
                     sample_wav = sample_wav.mean(dim=0, keepdim=True)
-                spk_emb = model.make_speaker_embedding(sample_wav.to(device1), sample_sr)
+                spk_emb = base.make_speaker_embedding(sample_wav.to(device1), sample_sr)
             else:
                 spk_emb = None
 
             sample_text = "jeʁuʃalˈajim hˈi ʔˈiʁ ʔatikˈa vaχaʃuvˈa bimjuχˈad, ʃemeχilˈa betoχˈa ʃχavˈot ʁabˈot ʃˈel histˈoʁja,"
             sample_cond_dict = make_cond_dict(text=sample_text, speaker=spk_emb, language="he", device=device0, speaking_rate=9.0)
-            sample_conditioning = model.prepare_conditioning(sample_cond_dict)
+            sample_conditioning = base.prepare_conditioning(sample_cond_dict)
 
             with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                out_codes = model.generate(sample_conditioning, batch_size=1, cfg_scale=4.0)
-            out_wav = model.autoencoder.decode(out_codes.to(device1)).cpu()
+                out_codes = base.generate(sample_conditioning, batch_size=1, cfg_scale=4.0)
+            out_wav = base.autoencoder.decode(out_codes.to(device1)).cpu()
             sample_out_path = os.path.join(args.save_dir, f"sample_epoch_{epoch+1}.wav")
-            torchaudio.save(sample_out_path, out_wav[0], model.autoencoder.sampling_rate)
+            torchaudio.save(sample_out_path, out_wav[0], base.autoencoder.sampling_rate)
             print(f"Sample saved at {sample_out_path}")
-            model.train()
+            base.train()
 
     print("Training complete.")
 

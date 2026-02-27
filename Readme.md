@@ -1,35 +1,28 @@
 # MamreStream Hebrew TTS
 
-Hebrew text-to-speech with real-time streaming and GPU acceleration.
+Hebrew text-to-speech with real-time streaming and GPU acceleration. Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
 
 ## Prerequisites
 
-- GPU: 6GB+ VRAM
-- [DiffMamba](https://github.com/maxmelichov/DiffMamba) backend (clone into project root)
+- **GPU:** 6GB+ VRAM (PyTorch 2.6 + CUDA 12.4)
+- **System (e.g. Ubuntu):** `espeak-ng`, `ffmpeg`, `libsndfile1`, `build-essential`, `python3-dev`
 
 ## Setup
 
-Install [uv](https://docs.astral.sh/uv/), then clone the repo and DiffMamba:
+1. Install [uv](https://docs.astral.sh/uv/), then clone the repo:
 
 ```bash
 git clone <this-repo>
 cd Mamre-TTS
-git clone https://github.com/maxmelichov/DiffMamba.git
 ```
 
-Run the installer (creates venv, installs PyTorch CUDA, and project deps):
+2. Run the installer. It creates a venv, installs **PyTorch 2.6.0+cu124**, project deps (including flash-attn, causal-conv1d), clones [DiffMamba](https://github.com/maxmelichov/DiffMamba) if missing, and installs it in editable mode. At the end it checks that torch 2.6 with CUDA is available.
 
 ```bash
 ./install.sh
 ```
 
-Install the DiffMamba backend:
-
-```bash
-cd DiffMamba && uv pip install -e . && cd ..
-```
-
-System deps (e.g. Ubuntu): `espeak-ng`, `ffmpeg`, `libsndfile1`, `build-essential`, `python3-dev`.
+No need to clone DiffMamba manually—the script does it if `DiffMamba/` is not present.
 
 ## Model & weights
 
