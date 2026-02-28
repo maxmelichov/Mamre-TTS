@@ -7,7 +7,6 @@ from tqdm import tqdm, trange
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchaudio
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
@@ -15,7 +14,7 @@ import pandas as pd
 from Mamre.autoencoder import DACAutoencoder
 from Mamre.model import Mamre
 from Mamre.conditioning import make_cond_dict, make_cond_dict_train
-from Mamre.codebook_pattern import apply_delay_pattern, revert_delay_pattern
+from Mamre.codebook_pattern import apply_delay_pattern
 
 
 def shift_right(codes: torch.Tensor, mask_token: int) -> torch.Tensor:
@@ -123,6 +122,13 @@ def train(args):
     n_gpus = torch.cuda.device_count() if cuda_available else 0
     print(f"Model device: {device0}; aux device: {device1}; GPUs: {n_gpus}")
 
+    if not os.path.isfile(args.csv_file):
+        raise FileNotFoundError(f"CSV file not found: {args.csv_file}")
+
+    checkpoint_path = getattr(args, "checkpoint", "") or ""
+    if checkpoint_path and not os.path.isfile(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
+
     autoencoder = DACAutoencoder()
     autoencoder.dac.eval()
     autoencoder.dac.requires_grad_(False)
@@ -131,7 +137,6 @@ def train(args):
     print("Loading model from notmax123/MamreTTS...")
     model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.safetensors")
 
-    checkpoint_path = getattr(args, "checkpoint", "") or ""
     if checkpoint_path:
         try:
             state = torch.load(checkpoint_path, map_location="cpu")
@@ -286,28 +291,29 @@ def train(args):
                 spk_emb = base.make_speaker_embedding(sample_wav.to(device1), sample_sr)
             else:
                 spk_emb = None
+                print("  Skipping sample (voices/Female1.mp3 not found).")
 
-            sample_text = "jeʁuʃalˈajim hˈi ʔˈiʁ ʔatikˈa vaχaʃuvˈa bimjuχˈad, ʃemeχilˈa betoχˈa ʃχavˈot ʁabˈot ʃˈel histˈoʁja,"
-            sample_cond_dict = make_cond_dict(text=sample_text, speaker=spk_emb, language="he", device=device0, speaking_rate=9.0)
-            sample_conditioning = base.prepare_conditioning(sample_cond_dict)
+            if spk_emb is not None:
+                sample_text = "jeʁuʃalˈajim hˈi ʔˈiʁ ʔatikˈa vaχaʃuvˈa bimjuχˈad, ʃemeχilˈa betoχˈa ʃχavˈot ʁabˈot ʃˈel histˈoʁja,"
+                sample_cond_dict = make_cond_dict(text=sample_text, speaker=spk_emb, language="he", device=device0, speaking_rate=9.0)
+                sample_conditioning = base.prepare_conditioning(sample_cond_dict)
 
-            with torch.amp.autocast("cuda", dtype=torch.bfloat16):
-                # Use a larger repetition_penalty_window to reduce audio repetition (default 2 is too small)
-                sampling_params = dict(
-                    min_p=0.1,
-                    repetition_penalty=3.0,
-                    repetition_penalty_window=64,
-                )
-                out_codes = base.generate(
-                    sample_conditioning,
-                    batch_size=1,
-                    sampling_params=sampling_params,
-                )
-            out_wav = base.autoencoder.decode(out_codes.to(device1)).cpu()
-            sample_out_path = os.path.join(args.save_dir, f"sample_epoch_{epoch+1}.wav")
-            torchaudio.save(sample_out_path, out_wav[0], base.autoencoder.sampling_rate)
-            print(f"Sample saved at {sample_out_path}")
-            base.train()
+                with torch.amp.autocast("cuda", dtype=torch.bfloat16):
+                    sampling_params = dict(
+                        min_p=0.1,
+                        repetition_penalty=3.0,
+                        repetition_penalty_window=64,
+                    )
+                    out_codes = base.generate(
+                        sample_conditioning,
+                        batch_size=1,
+                        sampling_params=sampling_params,
+                    )
+                out_wav = base.autoencoder.decode(out_codes.to(device1)).cpu()
+                sample_out_path = os.path.join(args.save_dir, f"sample_epoch_{epoch+1}.wav")
+                torchaudio.save(sample_out_path, out_wav[0], base.autoencoder.sampling_rate)
+                print(f"Sample saved at {sample_out_path}")
+        base.train()
 
     print("Training complete.")
 
@@ -324,8 +330,6 @@ def parse_args():
                         help="Batch size (set to 1 to avoid padding).")
     parser.add_argument("--learning_rate", type=float, default=1e-4,
                         help="Learning rate for the optimizer.")
-    parser.add_argument("--log_interval", type=int, default=10,
-                        help="Logging interval (iterations).")
     parser.add_argument("--num_workers", type=int, default=16,
                         help="Number of dataloader workers.")
     parser.add_argument("--checkpoint", type=str, default="",

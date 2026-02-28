@@ -8,8 +8,6 @@ import torchaudio
 import wave
 import numpy as np
 
-import re
-
 from Mamre.model import Mamre
 from Mamre.conditioning import make_cond_dict
 
@@ -165,7 +163,12 @@ def main():
 
     # Load the model (here we use the transformer variant).
     print("Loading model from notmax123/MamreTTS...")
-    model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.safetensors", device="cpu")
+    try:
+        model = Mamre.from_pretrained("notmax123/MamreTTS", model_filename="MamreV1.safetensors", device="cpu")
+    except Exception as e:
+        print(f"Error: Failed to load model: {e}", file=sys.stderr)
+        print("Ensure the model can be downloaded (network) or is cached.", file=sys.stderr)
+        sys.exit(1)
 
     model.eval()
     model.to(device)
@@ -312,10 +315,6 @@ def main():
     if failed_segments:
         print(f"Segments replaced with silence fallback: {failed_segments}")
     print(f"Saved streaming audio to 'streaming.wav' (sampling rate: {out_sr} Hz).")
-
-    # Or use the following to display the audio in the jupyter notebook:
-    # from IPython.display import Audio
-    # display(Audio(data=audio, rate=out_sr))
 
 
 if __name__ == "__main__":
