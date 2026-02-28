@@ -4,7 +4,7 @@ Hebrew text-to-speech with streaming support and GPU acceleration. **[GitHub](ht
 
 ## Prerequisites
 
-- **GPU:** 6GB+ VRAM (PyTorch 2.6 + CUDA 12.4)
+- **GPU:** NVIDIA only — 6GB+ VRAM (PyTorch 2.6 + CUDA 12.4). Does not support AMD/Intel GPUs.
 - **System (Ubuntu):** `espeak-ng`, `ffmpeg`, `libsndfile1`, `build-essential`, `python3-dev`
 
 ## Setup
