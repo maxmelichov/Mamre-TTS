@@ -9,7 +9,7 @@ import wave
 import numpy as np
 
 from Mamre.model import Mamre
-from Mamre.conditioning import make_cond_dict
+from Mamre.conditioning import make_cond_dict, is_hebrew_text
 
 texts = [
     """בעידן הבינה המלאכותית, הגבולות בין אדם למכונה מיטשטשים יותר מתמיד. יכולות החישוב והלמידה של מערכות מתקדמות מאפשרות כיום למחשבים להבין שפה, ליצור תוכן, ואף לזהות רגשות או כוונות אנושיות. עם זאת, האתגר האמיתי אינו רק טכנולוגי — הוא מוסרי וחברתי. השאלה איננה "מה אפשר לבנות", אלא "מה נכון לבנות". ככל שהטכנולוגיה מתקדמת, כך גוברת האחריות של המפתחים לוודא שהיא משרתת את האנושות — ולא להפך."""
@@ -142,6 +142,8 @@ def main():
         default=os.getenv("MAMRE_VOICE", "voices/Female1.mp3"),
         help="Path to reference audio for speaker embedding (default: voices/reference.mp3 or MAMRE_VOICE)",
     )
+    parser.add_argument("--language", type=str, default="he",
+                        help="Language code when segment is not Hebrew (Hebrew auto-detected → Phonikud ONNX).")
     args = parser.parse_args()
     voice_path = args.voice
 
@@ -218,8 +220,7 @@ def main():
         wav_writer.setsampwidth(2)
         wav_writer.setframerate(out_sr)
 
-    # --- Per-segment generation (using model.generate; no chunk streaming) ---
-    # Pass Hebrew text + language="he"; model's conditioner does Phonikud + espeak internally (same as train).
+    # Per-segment generation; Hebrew segments use Phonikud ONNX via language="he".
     print("Starting per-segment generation...")
 
     seg_counter = 0
@@ -239,7 +240,7 @@ def main():
             try:
                 cond = make_cond_dict(
                     text=segment,
-                    language="he",
+                    language="he" if is_hebrew_text(segment) else args.language,
                     speaking_rate=9.0,
                     speaker=speaker,
                 )

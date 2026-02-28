@@ -1,6 +1,6 @@
 # Mamre Hebrew TTS
 
-Hebrew text-to-speech with streaming support and GPU acceleration. Uses [uv](https://docs.astral.sh/uv/) for dependencies.
+Hebrew text-to-speech with streaming support and GPU acceleration. **[GitHub](https://github.com/maxmelichov/Mamre-TTS)** · Uses [uv](https://docs.astral.sh/uv/) for dependencies.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ Hebrew text-to-speech with streaming support and GPU acceleration. Uses [uv](htt
 1. Install [uv](https://docs.astral.sh/uv/) and clone the repo:
 
    ```bash
-   git clone <this-repo>
+   git clone https://github.com/maxmelichov/Mamre-TTS.git
    cd Mamre-TTS
    ```
 

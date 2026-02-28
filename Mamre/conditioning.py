@@ -12,6 +12,11 @@ from phonikud_onnx import Phonikud
 from phonikud import phonemize as phonikud_phonemize
 
 
+def is_hebrew_text(text: str) -> bool:
+    """Return True if text contains Hebrew letters (use language=\"he\" so Phonikud ONNX is used)."""
+    return any("\u0590" <= c <= "\u05FF" for c in text)
+
+
 class Conditioner(nn.Module):
     def __init__(
         self,

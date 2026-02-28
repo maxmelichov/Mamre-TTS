@@ -13,7 +13,7 @@ from pydub import AudioSegment
 from tqdm import tqdm
 from typing import List
 from Mamre.model import Mamre
-from Mamre.conditioning import make_cond_dict
+from Mamre.conditioning import make_cond_dict, is_hebrew_text
 
 
 def split_text_into_segments(text: str) -> List[str]:
@@ -165,7 +165,7 @@ def main():
             attempt += 1
             cond = make_cond_dict(
                 text=segment,
-                language=args.language,
+                language="he" if is_hebrew_text(segment) else args.language,
                 speaking_rate=args.speaking_rate,
                 speaker=speaker,
             )
