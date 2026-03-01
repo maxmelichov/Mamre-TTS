@@ -16,6 +16,17 @@ Hebrew text-to-speech with streaming support and GPU acceleration. **[GitHub](ht
    cd Mamre-TTS
    ```
 
+## Model Weights
+
+Download the TTS weights from [notmax123/MamreTTS](https://huggingface.co/notmax123/LightBlue](https://huggingface.co/notmax123/MamreTTS)) and the Phonikud model from [thewh1teagle/phonikud-onnx](https://huggingface.co/thewh1teagle/phonikud-onnx).
+
+```bash
+uv run hf download notmax123/LightBlue \
+  --repo-type onnx_model \
+  --local-dir ./onnx_model
+wget https://huggingface.co/thewh1teagle/phonikud-onnx/resolve/main/phonikud-1.0.int8.onnx
+```
+
 2. Run the installer (creates venv, installs PyTorch + deps, pulls DiffMamba if needed):
 
    ```bash
