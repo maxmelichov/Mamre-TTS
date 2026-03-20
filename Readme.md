@@ -67,6 +67,16 @@ uv run python train.py --csv_file data/tts_data.csv --checkpoint checkpoints/tra
 
 With multiple GPUs, the script uses all visible CUDA devices. Restrict with `CUDA_VISIBLE_DEVICES=0,1`.
 
+## Ethical Use & Disclaimer
+[!IMPORTANT]
+This project includes a zero-shot voice cloning feature. By using this software, you agree to the following:
+
+Prohibited Use: You may not use this tool to impersonate individuals or create content using the voice of a person without their express, informed consent.
+
+Responsibility: The author(s) of Mamre Hebrew TTS assume no responsibility for any misuse of this technology. Users are solely responsible for any legal, ethical, or social consequences resulting from the generated audio.
+
+Compliance: Ensure your use of this software complies with your local laws and the terms of service of any platform where the audio is shared.
+
 ## License
 
 - **Code:** Apache 2.0 — see [LICENSE](LICENSE).
